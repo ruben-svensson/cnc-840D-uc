@@ -1,0 +1,96 @@
+;-------------------------
+; YFLATTEN.SPF
+; Author: Ruben Svensson
+; Contact: ruben.svensson@example.com
+; Date: 2024-10-16
+;-------------------------
+; This program flattens a surface along the Y-axis by making multiple passes at a specified depth.
+; It moves the tool across the surface in a series of linear passes, adjusting the
+; depth incrementally to achieve a flat finish.
+;-------------------------
+; Parameters:
+; _RTP: Return plane (Z) position - the height to return to after each pass
+; _STEPS: Number of steps to take - the number of depth increments
+; _Z1: Starting Z position - the initial height of the tool
+; _Z2: Ending Z position - the final depth to reach
+; _Y1: Starting Y position - the starting horizontal position
+; _Y2: Ending Y position - the ending horizontal position
+; _MARGIN: Margin to add to the Y positions - additional space on either side of the Y range
+;-------------------------
+
+%_N_YFLATTEN_SPF
+PROC YFLATTEN(REAL _RTP, REAL _STEPS, REAL _Z1, REAL _Z2, REAL _Y1, REAL _Y2, REAL _MARGIN)
+
+; Define and initialize variables
+DEF REAL _RP, _DP, _LN, _YLENGTH
+DEF REAL _I, _J, _STEP
+DEF REAL TOOL_SIZE
+DEF REAL __Y1, __Y2 ; These are the actual values of Y1 and Y2 to be used in the program
+
+; Check for invalid parameters
+IF (_STEPS <= 2)
+  MSG("Number of steps must be greater than 2 in YFLATTEN.")
+  M0
+ENDIF
+
+DEF REAL _TMP
+
+; Check if _Z1 is less than _Z2 and handle the situation
+IF (_Z1 < _Z2)
+  MSG("Z1 must be greater than Z2 in YFLATTEN. Press Cycle Start to reverse the values.")
+  M0 ; Pause the program for operator confirmation
+  ; Swap the values of _Z1 and _Z2
+  _TMP = _Z1
+  _Z1 = _Z2
+  _Z2 = _TMP
+ENDIF
+
+; Calculate the number of steps and initialize parameters
+_LN = ABS(_STEPS)
+_RP = _Z1
+_DP = _Z2
+TOOL_SIZE = $P_TOOLR
+
+; Calculate step size and number of passes
+_STEP = ((_RP + ABS(_DP)) / _LN)
+_J = _LN - 1
+_YLENGTH = _Y2 - _Y1
+
+; Check if the step size is too large
+DEF REAL _MAX_SAFE_STEP = 2.0 ; Define a maximum safe step size (e.g., 2mm)
+DEF STRING[128] _MSG ; Define a message string
+IF (_STEP > _MAX_SAFE_STEP)
+  _MSG = "Warning: Step size is very big ("<< _STEP <<"mm>2mm). Consider increasing the number of steps. Press Cycle Start if you really want to continue."
+  MSG(_MSG)
+  M0 ; Pause the program for operator confirmation
+ENDIF
+
+; Adjust Y1 and Y2 for tool size and margin
+__Y1 = _Y1 - (TOOL_SIZE + _MARGIN) ; Subtract tool size and margin from the left side
+__Y2 = _Y2 + (TOOL_SIZE + _MARGIN) ; Add tool size and margin to the right side
+
+; Move to starting position safely
+N1 G0 Z=AC(_RTP) ; Move up to the return plane first
+N2 G0 Y=AC(__Y1)
+N3 G0 Z=AC(_RP)
+
+; Loop through each pass
+FOR _I = 1 TO _J
+  ; Move down to the next depth
+  N4 G1 Z=AC(_RP - (_I * _STEP))
+  
+  ; Move across the surface
+  N5 Y=AC(__Y2)
+  
+  ; Move down to the next depth
+  N6 Z=AC(_RP - (_I * _STEP + _STEP))
+  
+  ; Move back across the surface
+  N7 Y=AC(__Y1)
+ENDFOR
+
+; Move up to the return plane
+N8 G0 Z=AC(_RTP)
+
+; Return from the subprogram
+N9 RET

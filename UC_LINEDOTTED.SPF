@@ -1,0 +1,63 @@
+;-------------------------
+; UC_LINEDOTTED.SPF
+; Author: Ruben Svensson
+; Contact: ruben.svensson@example.com
+; Date: 2024-10-16
+;-------------------------
+; This program creates a series of dotted lines along a linear path between two points.
+; It divides the path into segments and moves the tool along each segment, creating a dotted line effect.
+;-------------------------
+; Parameters:
+; _RTP: Return plane (Z) position - the height to return to after each pass
+; _SDIS: Safe distance between segments - the height above the surface to move to between segments
+; _RP: Reference plane (Z) position - the height from which to start milling down
+; _DP: Depth plane (Z) position - the depth to move to for each dot
+; _X1: X coordinate of the starting point
+; _Y1: Y coordinate of the starting point
+; _X2: X coordinate of the ending point
+; _Y2: Y coordinate of the ending point
+; _I2: Number of segments to divide the path into
+;-------------------------
+
+%_N_UC_LINEDOTTED_SPF
+PROC UC_LINEDOTTED(REAL _RTP, REAL _SDIS, REAL _RP, REAL _DP, REAL _X1, REAL _Y1, REAL _X2, REAL _Y2, REAL _I2)
+
+; Define and initialize variables
+DEF REAL _I, _PTX1, _PTY1, _PTX2, _PTY2, _PER
+
+; Check for invalid parameters
+IF (_I2 <= 0)
+  MSG("Number of segments (_I2) must be greater than 0 in UC_LINEDOTTED.")
+  M0
+ENDIF
+ 
+; Calculate the percentage increment for each segment
+_PER = 1 / _I2
+
+; Move in XY plane to the starting point
+N1 G0 X=AC(_X1) Y=AC(_Y1)
+; Move to a safe height before starting
+N2 G0 Z=AC(_RTP)
+
+; Loop through each segment to create the dotted line
+FOR _I = 0 TO (_I2)
+    ; Calculate the start and end points of the current segment
+    _PTX1 = (_X1 + (_X2 - _X1) * (_I * _PER))
+    _PTY1 = (_Y1 + (_Y2 - _Y1) * (_I * _PER))
+    _PTX2 = (_X1 + (_X2 - _X1) * ((_I + 1) * _PER))
+    _PTY2 = (_Y1 + (_Y2 - _Y1) * ((_I + 1) * _PER))
+    
+    ; Move to the start point of the segment
+    N3 X=AC(_PTX1) Y=AC(_PTY1)
+    
+    ; Lower the tool to create the dot
+    N4 G1 Z=AC(_DP)
+    
+    ; Raise the tool back to the safe height _RP+SDIS
+    N5 G0 Z=AC(_RP + _SDIS)
+ENDFOR
+
+G0 Z=AC(_RTP) ; Return to the return plane height
+
+; Return from the subprogram
+N1000 RET
